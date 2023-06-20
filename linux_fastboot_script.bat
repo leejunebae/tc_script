@@ -31,6 +31,7 @@ IF %TERATERM%==1 (
 ::to input login and to input password (root) & (root)
 echo root>%COM_PORT_NUMBER%
 echo root>%COM_PORT_NUMBER%
+timeout /t 1
 
 ::to change the EVB to fastboot mode
 echo reboot bootloader>%COM_PORT_NUMBER%
