@@ -1,7 +1,8 @@
 ::Tested TCC805x Android12 V1.0.0
 @echo on
 ::Location of TCC805x SDK 
-set SDK_PATH=Z:\TCC805x\A12
+cd ..
+set SDK_PATH=%cd%
 set FWDN=%SDK_PATH%\FWDN
 
 IF NOT EXIST %FWDN% (

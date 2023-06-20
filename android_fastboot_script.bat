@@ -9,7 +9,8 @@ set TERATERM=1
 set COM_PORT_NUMBER=COM4
 
 ::Maincore Images
-set SDK_PATH=Z:\TCC805x\A12
+cd ..
+set SDK_PATH=%cd%
 
 ::need to set ANDROID_PRODUCT_OUT to use fastboot
 set ANDROID_PRODUCT_OUT=%SDK_PATH%\maincore\out\target\product\car_tcc8050_arm64
