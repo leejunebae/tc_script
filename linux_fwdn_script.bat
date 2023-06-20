@@ -1,14 +1,14 @@
 @echo on
-set FWDN=Z:\TCC805x\Linux\FWDN
+cd ..
+set FWDN=%cd%\FWDN
 
 IF NOT EXIST %FWDN% (
     mkdir FWDN
     copy build-autolinux\fwdn_v8\out\fwdn.exe FWDN
     copy build-autolinux\fwdn_v8\out\VtcUsbPort.dll FWDN
 )
-
 ::Location of TCC805x Linux SDK 
-set LINUX_SDK_PATH=Z:\TCC805x\Linux\build-autolinux
+set LINUX_SDK_PATH=%cd%\build-autolinux
 
 ::BOOT_FIRMWARE directoy have .json files for fwdn
 set BOOT_FIRMWARE=%LINUX_SDK_PATH%\build\tcc8050-main\tmp\deploy\images\tcc8050-main\boot-firmware
