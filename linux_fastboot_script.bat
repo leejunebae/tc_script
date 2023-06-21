@@ -31,7 +31,12 @@ IF %TERATERM%==1 (
 ::to input login and to input password (root) & (root)
 echo root>%COM_PORT_NUMBER%
 echo root>%COM_PORT_NUMBER%
+
+::to use bat file in Windows
 timeout /t 1
+
+::to use bat file in Git Bash
+sleep 1
 
 ::to change the EVB to fastboot mode
 echo reboot bootloader>%COM_PORT_NUMBER%
