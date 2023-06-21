@@ -36,7 +36,12 @@ fastboot reboot
 
 ::in case of V2.0.0, need to fastboot reboot twice
 IF %V2%==1 (
+    ::to use bat file in Windows
     timeout /t 5
+
+    ::to use bat file in Git Bash
+    sleep 5
+    
     fastboot reboot
 )
 pause
