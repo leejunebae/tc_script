@@ -9,6 +9,7 @@
 #                      Please Select the options
 ###############################################################################
 #Select android_12_version=1 or =2
+#Value will be changed automatically after read .repo/manifest.xml
 android_12_version=1
 
 #Select Platform 
@@ -35,12 +36,13 @@ envsetup=49
 
 #Select gpuvz (GPU Virtualization)
 #gpuvz=0 (default) or gpuvz=1
+#Value will be changed automatically if you choose subcore=1 (subcore cluster)
 gpuvz=0
 
 #Select subcore image
 #subcore_image=0 (from own build)
-#subcore_image=1 (subcore cluster, it will enable gpuvz)
-#subcore_image=2 (default)
+#subcore_image=1 (subcore cluster, will enable gpuvz)
+#subcore_image=2 (default, subcore, non-cluster)
 subcore_image=2
 
 #eMMC or UFS
@@ -53,6 +55,14 @@ yellow=`tput setaf 3`
 reset=`tput sgr0`
 
 export CMD_V_BUILD_OPTION=
+maincore_dir=$PWD/../maincore
+subcore_dir=$PWD/../subcore
+script_dir=$PWD
+kernel_dir=
+
+echo $maincore_dir
+echo $subcore_dir
+echo $script_dir
 
 function FUNC_get_filename() {
     url="$1"
@@ -66,28 +76,26 @@ function FUNC_get_filename_without_extension() {
     echo "$filename_without_extension"
 }
 
-function FUNC_Install_Toolchain() {
+function FUNC_Install_Toolchain() 
+{
     filename=$(FUNC_get_filename $1)
     dir_name=$(FUNC_get_filename_without_extension $filename)
     bin_name=$dir_name/bin    
 
     #If there is no tzr.xz -> download
-    if [ ! -f $filename ];
-    then
+    if [ ! -f $filename ];  then
         echo Start download $filename
         wget $1
     fi
 
     #If there is no dir_name -> decompress tar.xz
-    if [ ! -d $dir_name ];
-    then
+    if [ ! -d $dir_name ];  then
         echo Start decompress $filename
         tar -xvf $filename
     fi
 
     #IF param1 is not exist in PATH -> add it to PATH
-    if [[ ! "$PATH" == *$bin_name* ]]
-    then
+    if [[ ! "$PATH" == *$bin_name* ]];   then
         echo Start add $bin_name to PATH
         export PATH=$PATH:$PWD/$bin_name
         #remove the duplicated PATH
@@ -99,32 +107,30 @@ function FUNC_Install_Toolchain() {
 
 function FUNC_Bootloader_Toolchain()
 {
-    echo start FUNC_Bootloader_Toolchain
+    cd $script_dir
     FUNC_Install_Toolchain https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz
     FUNC_Install_Toolchain https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
-    echo end FUNC_Bootloader_Toolchain
 }
 
 function FUNC_Kernel_Toolchain()
 {
-    echo start FUNC_Kernel_Toolchain
+    cd $script_dir
+
     #Check Android12 SDK version
-    if [[ $android_12_version == 1 ]]; then
+    case $android_12_version in
+        1)  
         FUNC_Install_Toolchain https://releases.linaro.org/archive/14.09/components/toolchain/binaries/gcc-linaro-aarch64-linux-gnu-4.9-2014.09_linux.tar.xz
-        android_12_version=1
-    elif [[ $android_12_version == 2 ]]; then
+        ;;
+        2)  
         FUNC_Install_Toolchain https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/aarch64-linux-gnu/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
-    else
-        echo -e "\n                                Unknown Android12 SDK version"
-        exit
-    fi
-    echo end FUNC_Kernel_Toolchain
+        ;;
+        *)  echo -e "\nUnknown Android12 SDK version" && exit   ;;
+    esac    
 }
 
 function FUNC_check_default_revision()
 {
-    #echo start FUNC_check_default_revision
-    local file=../.repo/manifest.xml
+    local file=$script_dir/../.repo/manifest.xml
     local content=$(cat "$file")
 
     #extract default revision from XML file
@@ -141,147 +147,163 @@ function FUNC_check_default_revision()
         echo -e "\n                                Unknown SDK version"
         exit
     fi
-    #echo end FUNC_check_default_revision
 }
 
 function FUNC_print_current_setting()
 {
-    #echo start FUNC_print_current_setting
+	echo android_12_version = ${android_12_version}
     echo bit = ${bit}
     echo chip = ${chip}
     echo board = ${board}
     echo -e "core_numbers = ${core_numbers} (make -j${core_numbers})"
     echo -e "envsetip = ${envsetup} (lunch ${envsetup})"
     echo
-    #echo end FUNC_print_current_setting
 }
 
 function FUNC_Env_Setup()
 {
-    echo start FUNC_Env_Setup
-    pushd $PWD
-    cd ../maincore/
+    cd $maincore_dir
     source build/envsetup.sh
     lunch ${envsetup}
-    popd
-    echo end FUNC_Env_Setup
 }
 function FUNC_Build_Bootloader()
 {
-    echo start FUNC_Build_Bootloader
-    pushd $PWD
-    cd ../maincore/bootable/bootloader/u-boot/
+    cd $maincore_dir/bootable/bootloader/u-boot/
 
-    if [[ $bit == 32 ]]; then
-        export ARCH=arm
-        CROSS_COMPILE=arm-none-linux-gnueabihf-
-    elif [[ $bit == 64 ]]; then
-        export ARCH=arm64
-	    export CROSS_COMPILE=aarch64-none-linux-gnu-
-    else
-        echo -e "Unknown bit"
-        exit
-    fi
+    case $bit in
+        32) export ARCH=arm     CROSS_COMPILE=arm-none-linux-gnueabihf- ;;
+        64) export ARCH=arm64   CROSS_COMPILE=aarch64-none-linux-gnu-   ;;
+        *)  echo -e "Unknown bit" && exit ;;
+    esac
     
     export DEVICE_TREE=${chip}-${board}
     make tcc805x_android_12_defconfig
     make -j${core_numbers}
-    cd -
-    popd
-    echo end FUNC_Build_Bootloader
 }
 
-function FUNC_Build_Kernel_V1()
+function FUNC_set_gpuvz() 
 {
-    echo start FUNC_Build_Kernel_V1
-    pushd $PWD
+    #Check subcore_image type
+    case $subcore_image in
+        1) gpuvz=1  ;;     #to use prebuilt subcore_cluster, gpuvz should be enabled
+        *) echo "subcore_image=${subcore_image}";;
+    esac
 
-    #Check Android12 SDK version
-    if [[ $android_12_version == 1 ]]; then
-        cd ../maincore
-        unset ARCH
-        unset CROSS_COMPILE
-        cd prebuilts/clang/host/linux-x86/clang-r416183b1/bin/
-        export PATH=$PWD:$PATH
-        clang --version
-        export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
-        cd -
-        cd kernel
-        make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig
-        make ARCH=arm64 LLVM=1 -k CC=clang -j${core_numbers}
-        cd -
-    elif [[ $android_12_version == 2 ]]; then
-        cd ../maincore/device/telechips/car_tcc805x-kernel
-        sdk_dir=$PWD
-        cd -
-        cd ../kernel
-        export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1
-        BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR=$sdk_dir build/build_abi.sh -j8
-        cd -
+    file_path="$maincore_dir/device/telechips/car_tcc8050_arm64/device.mk"
+    
+    if [ "$gpuvz" -eq 0 ]; then
+        sed -i 's/TCC_GPU_VZ  ?=  true/TCC_GPU_VZ  ?=  false/' "$file_path"
+        echo "Modified TCC_GPU_VZ value to false."
+    elif [ "$gpuvz" -eq 1 ]; then
+        sed -i 's/TCC_GPU_VZ  ?=  false/TCC_GPU_VZ  ?=  true/' "$file_path"
+        echo "Modified TCC_GPU_VZ value to true."
     else
-        echo -e "\n                                Unknown Android12 SDK version"
+        echo "Invalid gpuvz value. Must be 0 or 1."
         exit
     fi
+    
+    config_file=
+    
+    case $android_12_version in
+        1)  config_file="$kernel_dir/arch/arm64/configs/tcc805x_android_12_ivi_defconfig"    ;;
+        2)  config_file="$kernel_dir/common/arch/arm64/configs/telechips_gki_tcc805x.fragment"  ;;
+        *)  echo -e "\nUnknown Android12 SDK version" && exit   ;;
+    esac
 
+    echo "$config_file"
 
-    popd
-    echo end FUNC_Build_Kernel_V1
+    
+
+    # Check and modify the CONFIG_POWERVR_VZ entry in the file
+    if grep -q "CONFIG_POWERVR_VZ" "$config_file"; then
+        if [ "$gpuvz" -eq 0 ]; then
+            # Delete the line if gpuvz is 0 and the entry exists
+            sed -i '/CONFIG_POWERVR_VZ/d' "$config_file"
+            echo "Deleted the CONFIG_POWERVR_VZ entry."
+        else
+            echo "The CONFIG_POWERVR_VZ entry already exists."
+        fi
+    else
+        if [ "$gpuvz" -eq 1 ]; then
+            # Add CONFIG_POWERVR_VZ=y if gpuvz is 1 and the entry does not exist
+            echo "CONFIG_POWERVR_VZ=y" >> "$config_file"
+            echo "Added the CONFIG_POWERVR_VZ entry."
+        else
+            echo "The CONFIG_POWERVR_VZ entry does not exist."
+        fi
+    fi
 }
+
+
+function FUNC_Build_Kernel() {
+    case $android_12_version in
+        1)
+            unset ARCH
+            unset CROSS_COMPILE
+            export PATH="$maincore_dir/prebuilts/clang/host/linux-x86/clang-r416183b1/bin/:$PATH"
+            export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+            kernel_dir="$maincore_dir/kernel"
+            cd "$kernel_dir"
+
+            FUNC_set_gpuvz
+
+            make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig
+            make ARCH=arm64 LLVM=1 -k CC=clang -j"$core_numbers"
+            cd -
+            ;;
+        2)
+            sdk_dir="$maincore_dir/device/telechips/car_tcc805x-kernel"
+            kernel_dir="$script_dir/../kernel"
+            cd "$kernel_dir"
+            export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1
+
+            FUNC_set_gpuvz
+
+            BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR="$sdk_dir" build/build_abi.sh -j"$core_numbers"
+            ;;
+        *)
+            echo -e "\nUnknown Android12 SDK version" && exit
+            ;;
+    esac
+}
+
+
 function FUNC_Build_Framework()
 {
-    echo start FUNC_Build_Framework
-    pushd $PWD
-    cd ../maincore
+    cd $maincore_dir
     make -j${core_numbers}
-    cd -
-    popd
-    echo end FUNC_Build_Framework
 }
 
 function FUNC_use_mktcimg()
 {
-    echo start FUNC_use_mktcimg
-    pushd $PWD
-    uboot_dir=$PWD/../maincore/bootable/bootloader/u-boot
-    car_tcc8050_arm64_dir=$PWD/../maincore/out/target/product/car_tcc8050_arm64
+    uboot_dir=$maincore_dir/bootable/bootloader/u-boot
+    car_tcc8050_arm64_dir=$maincore_dir/out/target/product/car_tcc8050_arm64
     echo ${uboot_dir}
     echo ${car_tcc8050_arm64_dir}
 
     #Check subcore_image type
-    if [[ $subcore_image == 0 ]]; then #own build subcore
-        cd ../subcore/build/tcc8050-sub/tmp/deploy/images/tcc8050-sub
-    elif [[ $subcore_image == 1 ]]; then #prebuilt subcore_cluster
-        cd ../maincore/device/telechips/car_tcc8050_arm64/subcore_cluster
-    elif [[ $subcore_image == 2 ]]; then #prebuilt subcore (default)
-        cd ../maincore/device/telechips/car_tcc8050_arm64/subcore
-    else
-        echo -e "\n                                Unknown subcore_image type"
-        exit
-    fi
+    case $subcore_image in
+        0) cd "$subcore_dir/build/tcc8050-sub/tmp/deploy/images/tcc8050-sub" ;;         #own build subcore
+        1) cd "$maincore_dir/device/telechips/car_tcc8050_arm64/subcore_cluster" ;;     #prebuilt subcore_cluster
+        2) cd "$maincore_dir/device/telechips/car_tcc8050_arm64/subcore" ;;             #prebuilt subcore (default)
+        *) echo -e "\nUnknown subcore_image type" && exit ;;
+    esac
 
     cp ca53_bl3.rom ${uboot_dir}
     cp tc-boot-tcc8050-sub.img telechips-subcore-image-tcc8050-sub.ext4 tcc8050-linux-subcore_sv1.0-tcc8050-sub.dtb ${car_tcc8050_arm64_dir}
-    
-    if [[ $eMMC == 1 ]]; then #In case of eMMC
-        cd ${uboot_dir}/boot-firmware/tools/mktcimg 
-        ./mktcimg --parttype gpt --storage_size 7818182656  --fplist gpt_partition_for_arm64.list --outfile SD_Data.fai --area_name "SD Data" --gptfile SD_Data.gpt -l 4096 
-    elif [[ $eMMC == 0 ]]; then #In case of UFS
-        cd ${uboot_dir}/boot-firmware/tools/mktcimg 
-        ./mktcimg --parttype gpt --storage_size 31998345216 --fplist gpt_partition_for_arm64.list --outfile SD_Data.fai --area_name "SD Data" --gptfile SD_Data.gpt --sector_size 4096 
-    else
-        echo -e "\n                                Unknown memory type (eMMC or UFS)"
-        exit
-    fi
 
-    popd
-    echo end FUNC_use_mktcimg
+    cd ${uboot_dir}/boot-firmware/tools/mktcimg 
+
+    case $eMMC in
+        0) ./mktcimg --parttype gpt --storage_size 31998345216 --fplist gpt_partition_for_arm64.list --outfile SD_Data.fai --area_name "SD Data" --gptfile SD_Data.gpt --sector_size 4096 ;;
+        1) ./mktcimg --parttype gpt --storage_size 7818182656 --fplist gpt_partition_for_arm64.list --outfile SD_Data.fai --area_name "SD Data" --gptfile SD_Data.gpt -l 4096 ;;
+        *) echo -e "\nUnknown memory type (eMMC or UFS)" && exit ;;
+    esac
 }
 
 function FUNC_Make_SNOR_ROM_Image ()
 {
-    echo start FUNC_Make_SNOR_ROM_Image
-    pushd $PWD
-    uboot_dir=$PWD/../maincore/bootable/bootloader/u-boot
+    uboot_dir=$maincore_dir/bootable/bootloader/u-boot
     TCC8050_prebuilt_dir=${uboot_dir}/boot-firmware/tools/tcc805x_snor_mkimage/
         
     echo ${uboot_dir}
@@ -289,8 +311,6 @@ function FUNC_Make_SNOR_ROM_Image ()
 
     cd ${TCC8050_prebuilt_dir}
     ./tcc805x-snor-mkimage -i tcc8050.cs.cfg -o ./tcc805x_snor.cs.rom
-    popd
-    echo end FUNC_Make_SNOR_ROM_Image
 }
 
 function FUNC_main_menu()
@@ -349,7 +369,7 @@ function FUNC_main_menu()
     FUNC_Kernel_Toolchain
     FUNC_Env_Setup
     FUNC_Build_Bootloader
-    FUNC_Build_Kernel_V1
+    FUNC_Build_Kernel
     FUNC_Build_Framework
     FUNC_use_mktcimg
     FUNC_Make_SNOR_ROM_Image
@@ -367,7 +387,7 @@ function FUNC_main_menu()
     ;;
     5) #5. Build Kernel only
     FUNC_Env_Setup
-    FUNC_Build_Kernel_V1
+    FUNC_Build_Kernel
     ;;
     6) #6. Build Framework only
     FUNC_Env_Setup
@@ -380,7 +400,7 @@ function FUNC_main_menu()
     FUNC_Make_SNOR_ROM_Image
     ;;
     9) #
-    echo
+    FUNC_set_gpuvz
     ;;
     esac
 }
