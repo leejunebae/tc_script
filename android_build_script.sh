@@ -25,8 +25,8 @@ chip=tcc8050
 board=evb_sv1.0
 
 #Select Core Number for build
-#core_numbers=8
-core_numbers=8
+#threads=8
+threads=$(nproc)
 
 #Select envsetup
 #48. car_tcc803xp_arm64-eng
@@ -147,17 +147,26 @@ function FUNC_check_default_revision()
         echo -e "\n                                Unknown SDK version"
         exit
     fi
+
+    #Check subcore_image type
+    if [ "$subcore_image" -eq 1 ]; then
+        gpuvz=1     #to use prebuilt subcore_cluster, gpuvz should be enabled        
+        echo "gpuvz is enabled, due to subcore_image = 1"
+    fi
 }
 
 function FUNC_print_current_setting()
 {
-	echo android_12_version = ${android_12_version}
-    echo bit = ${bit}
-    echo chip = ${chip}
-    echo board = ${board}
-    echo -e "core_numbers = ${core_numbers} (make -j${core_numbers})"
-    echo -e "envsetip = ${envsetup} (lunch ${envsetup})"
-    echo
+	echo android_12_version=${android_12_version}
+    echo bit=${bit}
+    echo chip=${chip}
+    echo board=${board}
+    echo -e "threads=${threads}\t\t- make -j${threads}"
+    echo -e "envsetup=${envsetup}\t\t- lunch ${envsetup}"
+
+    echo -e "gpuvz=${gpuvz}\t\t\t- for Subcore Cluster"
+    echo -e "subcore_image=${subcore_image}\t\t- 0: own build, 1: prebuilt subcore cluster, 2: prebuilt subcore (default)"
+    echo -e "eMMC=${eMMC}\t\t\t- 1: eMMC (default), 0: UFS"
 }
 
 function FUNC_Env_Setup()
@@ -178,17 +187,11 @@ function FUNC_Build_Bootloader()
     
     export DEVICE_TREE=${chip}-${board}
     make tcc805x_android_12_defconfig
-    make -j${core_numbers}
+    make -j${threads}
 }
 
 function FUNC_set_gpuvz() 
 {
-    #Check subcore_image type
-    case $subcore_image in
-        1) gpuvz=1  ;;     #to use prebuilt subcore_cluster, gpuvz should be enabled
-        *) echo "subcore_image=${subcore_image}";;
-    esac
-
     file_path="$maincore_dir/device/telechips/car_tcc8050_arm64/device.mk"
     
     if [ "$gpuvz" -eq 0 ]; then
@@ -211,8 +214,6 @@ function FUNC_set_gpuvz()
     esac
 
     echo "$config_file"
-
-    
 
     # Check and modify the CONFIG_POWERVR_VZ entry in the file
     if grep -q "CONFIG_POWERVR_VZ" "$config_file"; then
@@ -248,7 +249,7 @@ function FUNC_Build_Kernel() {
             FUNC_set_gpuvz
 
             make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig
-            make ARCH=arm64 LLVM=1 -k CC=clang -j"$core_numbers"
+            make ARCH=arm64 LLVM=1 -k CC=clang -j"$threads"
             cd -
             ;;
         2)
@@ -259,7 +260,7 @@ function FUNC_Build_Kernel() {
 
             FUNC_set_gpuvz
 
-            BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR="$sdk_dir" build/build_abi.sh -j"$core_numbers"
+            BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR="$sdk_dir" build/build_abi.sh -j"$threads"
             ;;
         *)
             echo -e "\nUnknown Android12 SDK version" && exit
@@ -271,7 +272,7 @@ function FUNC_Build_Kernel() {
 function FUNC_Build_Framework()
 {
     cd $maincore_dir
-    make -j${core_numbers}
+    make -j${threads}
 }
 
 function FUNC_use_mktcimg()
@@ -340,13 +341,13 @@ function FUNC_main_menu()
         echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  4. Build Bootloader only"
         echo "|   - bootloader build : default - 64 bit / TCC805x / TCC8050 EVB 1.0 / Maincore"
-        echo "|   - make tcc805x_android_12_defconfig / make -j${core_numbers}"
+        echo "|   - make tcc805x_android_12_defconfig / make -j${threads}"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  5. Build Kernel only"
         echo "|   - make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  6. Build Framework only"
-        echo "|   - default : make -j${core_numbers}"
+        echo "|   - default : make -j${threads}"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  7. Make SD_Data.fai (+Copy the prebuilt SubCore images)"
         echo "+----------------------------------------------------------------------------------------------------------------+"
