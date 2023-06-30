@@ -91,17 +91,22 @@ function FUNC_Install_Toolchain()
     #If there is no dir_name -> decompress tar.xz
     if [ ! -d $dir_name ];  then
         echo Start decompress $filename
-        tar -xvf $filename
+        tar -xf $filename
     fi
+
+    #remove the duplicated PATH
+    export PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
+    #echo $PATH | tr ':' '\n'
 
     #IF param1 is not exist in PATH -> add it to PATH
     if [[ ! "$PATH" == *$bin_name* ]];   then
         echo Start add $bin_name to PATH
         export PATH=$PATH:$PWD/$bin_name
-        #remove the duplicated PATH
-        export PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
-        echo $PATH
-        echo 'export PATH=$PATH':$PWD/$bin_name >> ~/.bashrc
+    fi
+
+    #Add bin_name to ~/.bashrc
+    if ! grep -q 'export PATH=$PATH:'$PWD/$bin_name ~/.bashrc; then
+            echo 'export PATH=$PATH:'$PWD/$bin_name >> ~/.bashrc
     fi
 }
 
