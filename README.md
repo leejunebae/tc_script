@@ -1,10 +1,14 @@
 # tc_script
-Telechips Singapore Branch's Script for FWDN(firmware downloader) and Fastboot
+Telechips Singapore Branch's Scripts 
+1) fwdn_script.bat : FWDN(firmware downloader) - Windows OS
+2) fastboot_script.bat : Bootloader / Kernel / Framework / Partition update - Windows OS
+3) build_script.sh - Linux OS
 
 [Branches]
 - TCC805x Android12 IVI V1.0.0 / V2.0.0
+- TCC805x Android13 IVI V1.0.0
 
-git clone https://github.com/leejunebae/tc_script -b TCC805x_Android12_IVI
+git clone https://github.com/leejunebae/tc_script -b TCC805x_Android_IVI
 
 - TCC805x Linux IVI K5.4
 

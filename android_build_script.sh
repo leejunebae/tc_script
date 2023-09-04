@@ -1,16 +1,16 @@
 #!/bin/bash -i
 ###############################################################################
 #
-#                      TCC805x Android Toolchain Downloader
+#                      TCC805x Android Build Script
 #
 ###############################################################################
 
 ###############################################################################
-#                      Please Select the options
+# options
 ###############################################################################
-#Select android_12_version=1 or =2
-#Value will be changed automatically after read .repo/manifest.xml
-android_12_version=1
+#This value will be changed automatically after read .repo/manifest.xml
+android_version=0
+SDK_number=1
 
 #Select Platform 
 #bit=64 (default) or bit=32
@@ -29,10 +29,15 @@ board=evb_sv1.0
 threads=$(nproc)
 
 #Select envsetup
+#in case of Android 12 V1.0.0 / V2.0.0
 #48. car_tcc803xp_arm64-eng
 #49. car_tcc8050_arm64-eng (default)
 #50. car_tcc8059_arm64-eng 
-envsetup=49
+
+#in case of Android 13 V1.0.0
+#47. car_tcc8050_arm64-eng (default)
+#48. car_tcc8059_arm64-eng 
+envsetup=0
 
 #Select gpuvz (GPU Virtualization)
 #gpuvz=0 (default) or gpuvz=1
@@ -76,7 +81,7 @@ function FUNC_get_filename_without_extension() {
     echo "$filename_without_extension"
 }
 
-function FUNC_Install_Toolchain() 
+function FUNC_Install_Toolchain()
 {
     filename=$(FUNC_get_filename $1)
     dir_name=$(FUNC_get_filename_without_extension $filename)
@@ -121,37 +126,51 @@ function FUNC_Kernel_Toolchain()
 {
     cd $script_dir
 
-    #Check Android12 SDK version
-    case $android_12_version in
-        1)  
+    #Check Android SDK version
+    if [ "$android_version" -eq 12 ] && [ "$SDK_number" -eq 1 ]; then
         FUNC_Install_Toolchain https://releases.linaro.org/archive/14.09/components/toolchain/binaries/gcc-linaro-aarch64-linux-gnu-4.9-2014.09_linux.tar.xz
-        ;;
-        2)  
+    else
         FUNC_Install_Toolchain https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/aarch64-linux-gnu/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
-        ;;
-        *)  echo -e "\nUnknown Android12 SDK version" && exit   ;;
-    esac    
+    fi
 }
 
 function FUNC_check_default_revision()
 {
     local file=$script_dir/../.repo/manifest.xml
-    local content=$(cat "$file")
+    local content=$(<"$file")
 
     #extract default revision from XML file
     local revision=$(echo "$content" | grep -oP '(?<=<default revision=")[^"]+')
 
     #Check the version
-    if [[ $revision == *"Android12_IVI_v1.0.0"* ]]; then
-        echo -e "\n                                TCC805x Android12 IVI SDK version is ${green}V1.0.0${reset}"
-        android_12_version=1
-    elif [[ $revision == *"Android12_IVI_v2.0.0"* ]]; then
-        echo -e "\n                                TCC805x Android12 IVI SDK version is ${green}V2.0.0${reset}"
-        android_12_version=2
-    else
-        echo -e "\n                                Unknown SDK version"
-        exit
-    fi
+    case $revision in
+        *"Android13_IVI_v1.0.0"*)
+            android_version=13
+            SDK_number=1
+            envsetup=47
+            ;;
+        *"Android13_IVI_v2.0.0"*)
+            android_version=13
+            SDK_number=2
+            envsetup=47
+            ;;
+        *"Android12_IVI_v1.0.0"*)
+            android_version=12
+            SDK_number=1
+            envsetup=49
+            ;;
+        *"Android12_IVI_v2.0.0"*)
+            android_version=12
+            SDK_number=2
+            envsetup=49
+            ;;
+        *)
+            echo -e "\nUnknown SDK version"
+            exit
+            ;;
+    esac
+
+    echo -e "\n                                TCC805x Android${android_version} IVI SDK version is ${green}V${SDK_number}.0.0${reset}"
 
     #Check subcore_image type
     if [ "$subcore_image" -eq 1 ]; then
@@ -162,7 +181,8 @@ function FUNC_check_default_revision()
 
 function FUNC_print_current_setting()
 {
-	echo android_12_version=${android_12_version}
+	echo android_version=${android_version}
+    echo SDK_number=${SDK_number}
     echo bit=${bit}
     echo chip=${chip}
     echo board=${board}
@@ -191,7 +211,13 @@ function FUNC_Build_Bootloader()
     esac
     
     export DEVICE_TREE=${chip}-${board}
-    make tcc805x_android_12_defconfig
+
+    if [ "$android_version" -eq 12 ] && [ "$SDK_number" -eq 1 ]; then
+        make tcc805x_android_12_defconfig
+    else
+        make tcc805x_android_13_defconfig
+    fi
+    
     make -j${threads}
 }
 
@@ -200,24 +226,23 @@ function FUNC_set_gpuvz()
     file_path="$maincore_dir/device/telechips/car_tcc8050_arm64/device.mk"
     
     if [ "$gpuvz" -eq 0 ]; then
-        sed -i 's/TCC_GPU_VZ  ?=  true/TCC_GPU_VZ  ?=  false/' "$file_path"
-        echo "Modified TCC_GPU_VZ value to false."
+        gpuvz_value="false"
     elif [ "$gpuvz" -eq 1 ]; then
-        sed -i 's/TCC_GPU_VZ  ?=  false/TCC_GPU_VZ  ?=  true/' "$file_path"
-        echo "Modified TCC_GPU_VZ value to true."
+        gpuvz_value="true"
     else
         echo "Invalid gpuvz value. Must be 0 or 1."
         exit
     fi
-    
-    config_file=
-    
-    case $android_12_version in
-        1)  config_file="$kernel_dir/arch/arm64/configs/tcc805x_android_12_ivi_defconfig"    ;;
-        2)  config_file="$kernel_dir/common/arch/arm64/configs/telechips_gki_tcc805x.fragment"  ;;
-        *)  echo -e "\nUnknown Android12 SDK version" && exit   ;;
-    esac
 
+    sed -i "s/TCC_GPU_VZ  ?=  .*/TCC_GPU_VZ  ?=  $gpuvz_value/" "$file_path"
+    echo "Modified TCC_GPU_VZ value to $gpuvz_value."
+    
+    if [ "$android_version" -eq 12 ] && [ "$SDK_number" -eq 1 ]; then
+        config_file="$kernel_dir/arch/arm64/configs/tcc805x_android_12_ivi_defconfig"
+    else
+        config_file="$kernel_dir/common/arch/arm64/configs/telechips_gki_tcc805x.fragment"
+    fi
+    
     echo "$config_file"
 
     # Check and modify the CONFIG_POWERVR_VZ entry in the file
@@ -242,35 +267,30 @@ function FUNC_set_gpuvz()
 
 
 function FUNC_Build_Kernel() {
-    case $android_12_version in
-        1)
-            unset ARCH
-            unset CROSS_COMPILE
-            export PATH="$maincore_dir/prebuilts/clang/host/linux-x86/clang-r416183b1/bin/:$PATH"
-            export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
-            kernel_dir="$maincore_dir/kernel"
-            cd "$kernel_dir"
 
-            FUNC_set_gpuvz
+    if [ "$android_version" -eq 12 ] && [ "$SDK_number" -eq 1 ]; then
+        unset ARCH
+        unset CROSS_COMPILE
+        export PATH="$maincore_dir/prebuilts/clang/host/linux-x86/clang-r416183b1/bin/:$PATH"
+        export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+        kernel_dir="$maincore_dir/kernel"
+        cd "$kernel_dir"
 
-            make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig
-            make ARCH=arm64 LLVM=1 -k CC=clang -j"$threads"
-            cd -
-            ;;
-        2)
-            sdk_dir="$maincore_dir/device/telechips/car_tcc805x-kernel"
-            kernel_dir="$script_dir/../kernel"
-            cd "$kernel_dir"
-            export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1
+        FUNC_set_gpuvz
 
-            FUNC_set_gpuvz
+        make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig
+        make ARCH=arm64 LLVM=1 -k CC=clang -j"$threads"
+        cd -
+    else
+        sdk_dir="$maincore_dir/device/telechips/car_tcc805x-kernel"
+        kernel_dir="$script_dir/../kernel"
+        cd "$kernel_dir"
+        export ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1
 
-            BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR="$sdk_dir" build/build_abi.sh -j"$threads"
-            ;;
-        *)
-            echo -e "\nUnknown Android12 SDK version" && exit
-            ;;
-    esac
+        FUNC_set_gpuvz
+
+        BUILD_CONFIG=common/build.config.gki.tcc805x_aarch64 DIST_DIR="$sdk_dir" build/build_abi.sh -j"$threads"
+    fi
 }
 
 
@@ -298,7 +318,12 @@ function FUNC_use_mktcimg()
     cp ca53_bl3.rom ${uboot_dir}
     cp tc-boot-tcc8050-sub.img telechips-subcore-image-tcc8050-sub.ext4 tcc8050-linux-subcore_sv1.0-tcc8050-sub.dtb ${car_tcc8050_arm64_dir}
 
-    cd ${uboot_dir}/boot-firmware/tools/mktcimg 
+    if [ "$android_version" -eq 12 ]; then
+        cd ${uboot_dir}/boot-firmware/tools/mktcimg 
+    else
+        cd ${uboot_dir}/boot-firmware-tcc805x/tools/mktcimg 
+    fi
+    
 
     case $eMMC in
         0) ./mktcimg --parttype gpt --storage_size 31998345216 --fplist gpt_partition_for_arm64.list --outfile SD_Data.fai --area_name "SD Data" --gptfile SD_Data.gpt --sector_size 4096 ;;
@@ -310,8 +335,13 @@ function FUNC_use_mktcimg()
 function FUNC_Make_SNOR_ROM_Image ()
 {
     uboot_dir=$maincore_dir/bootable/bootloader/u-boot
-    TCC8050_prebuilt_dir=${uboot_dir}/boot-firmware/tools/tcc805x_snor_mkimage/
-        
+
+    if [ "$android_version" -eq 12 ]; then
+        TCC8050_prebuilt_dir=${uboot_dir}/boot-firmware/tools/tcc805x_snor_mkimage/
+    else
+        TCC8050_prebuilt_dir=${uboot_dir}/boot-firmware-tcc805x/tools/tcc805x_snor_mkimage/
+    fi
+            
     echo ${uboot_dir}
     echo ${TCC8050_prebuilt_dir}
 
@@ -331,25 +361,23 @@ function FUNC_main_menu()
         echo "******************************************************************************************************************"
         echo "|  1. Build All-in-one"
         echo "|   - Install Bootloader Toolchain"
-        echo "|   - Install Kernel Toolchain for ${green}V${android_12_version}.0.0${reset}"
+        echo "|   - Install Kernel Toolchain for ${green}V${SDK_number}.0.0${reset}"
         echo "|   - Set Up Compiling Environment"
         echo "|   - Build Bootloader / Kernel / Framework"
         echo "|   - Make SD_Data.fai"
         echo "|   - Make SNOR ROM Image"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
-        echo "|  2. Install Toolchain for TCC805x Android12 IVI ${green}V${android_12_version}.0.0${reset}"
-        echo "|   - Bootloader Toolchain for TCC805x Android12"
-        echo "|   - Kernel Toolchain for TCC805x Android12 ${green}V${android_12_version}.0.0${reset}"
+        echo "|  2. Install Toolchain for TCC805x Android${android_version} IVI ${green}V${SDK_number}.0.0${reset}"
+        echo "|   - Bootloader Toolchain for TCC805x Android${android_version}"
+        echo "|   - Kernel Toolchain for TCC805x Android${android_version} ${green}V${SDK_number}.0.0${reset}"
         echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  3. Set Up Compiling Environment"
         echo "|   - Env : lunch ${envsetup}"
         echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  4. Build Bootloader only"
         echo "|   - bootloader build : default - 64 bit / TCC805x / TCC8050 EVB 1.0 / Maincore"
-        echo "|   - make tcc805x_android_12_defconfig / make -j${threads}"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  5. Build Kernel only"
-        echo "|   - make ARCH=arm64 LLVM=1 tcc805x_android_12_ivi_defconfig"
 		echo "+----------------------------------------------------------------------------------------------------------------+"
         echo "|  6. Build Framework only"
         echo "|   - default : make -j${threads}"
@@ -380,7 +408,7 @@ function FUNC_main_menu()
     FUNC_use_mktcimg
     FUNC_Make_SNOR_ROM_Image
     ;;
-    2) #Install Toolchain for TCC805x Android12 IVI
+    2) #Install Toolchain for TCC805x Android IVI
     FUNC_Bootloader_Toolchain
     FUNC_Kernel_Toolchain
     ;;
