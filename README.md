@@ -1,14 +1,53 @@
 # tc_script
-Telechips Singapore Branch's Script for FWDN(firmware downloader) and Fastboot
+Telechips Singapore Branch's Scripts 
 
 [Branches]
-- TCC805x Android12 IVI V1.0.0 / V2.0.0
+1. TCC805x_Android_IVI
+- Tested: 
+    TCC805x Android 12 IVI V1.0.0 / V2.0.0
+    TCC805x Android 13 IVI V1.0.0
 
-git clone https://github.com/leejunebae/tc_script -b TCC805x_Android12_IVI
+- How to download
+git clone https://github.com/leejunebae/tc_script -b TCC805x_Android_IVI
 
-- TCC805x Linux IVI K5.4
+- Include:
+1) android_fwdn_script.bat
+    * example for FWDN (firmware downloader)
+    * can be executed in Windows OS
+    * need to connect UART serial port to command
+    * need to connect USB to flash
 
+2) android_fastboot_script.bat 
+    * Bootloader / Kernel / Framework / Partition update
+    * can be executed in Windows OS
+    * need to connect UART serial port to command
+    * need to connect USB to flash
+
+3) android_build_script.sh
+    * can be executed in Linux Build Server
+    * help to download compiler
+    * help to build all in one
+    * help to build separately
+
+2. TCC805x_Linux_IVI_K5.4
+- Tested:
+    TCC805x Linux IVI K5.4 V1.0.0
+
+- How to download
 git clone https://github.com/leejunebae/tc_script -b TCC805x_Linux_IVI_K5.4
+
+- Include:
+1) linux_fastboot_script.bat
+    * example for FWDN (firmware downloader)
+    * can be executed in Windows OS
+    * need to connect UART serial port to command
+    * need to connect USB to flash
+
+2) linux_fwdn_script.bat
+    * Bootloader / Kernel / Framework / Partition update
+    * can be executed in Windows OS
+    * need to connect UART serial port to command
+    * need to connect USB to flash
 
 [How to use]
 Please refer to the Goolge Docs for Android / Linux
