@@ -4,8 +4,9 @@ Telechips Singapore Branch's Scripts
 [Branches]
 1. TCC805x_Android_IVI
 - Tested: 
-a) TCC805x Android 12 IVI V1.0.0 / V2.0.0
-b) TCC805x Android 13 IVI V1.0.0
+
+TCC805x Android 12 IVI V1.0.0 / V2.0.0
+TCC805x Android 13 IVI V1.0.0
 
 - How to download
 
