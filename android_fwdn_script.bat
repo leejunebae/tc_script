@@ -1,14 +1,17 @@
 ::Tested TCC805x Android12 V1.0.0
 @echo on
-::Location of TCC805x SDK 
+::Location of TCC805x SDK
+set TC_SCRIPT_PATH=%cd%
 cd ..
 set SDK_PATH=%cd%
-set FWDN=%SDK_PATH%\FWDN
+set FWDN=%TC_SCRIPT_PATH%\FWDN
+
+cd %TC_SCRIPT_PATH%
 
 IF NOT EXIST %FWDN% (
-    mkdir FWDN
-    copy %SDK_PATH%\maincore\vendor\telechips\tools\FWDN\out\fwdn.exe FWDN
-    copy %SDK_PATH%\maincore\vendor\telechips\tools\FWDN\out\VtcUsbPort.dll FWDN
+    mkdir %FWDN%
+    copy %SDK_PATH%\maincore\vendor\telechips\tools\FWDN\out\fwdn.exe %FWDN%
+    copy %SDK_PATH%\maincore\vendor\telechips\tools\FWDN\out\VtcUsbPort.dll %FWDN%
 )
 
 ::BOOT_FIRMWARE directoy have .json files for fwdn
@@ -20,12 +23,12 @@ set SD_DATA=%SDK_PATH%\maincore\bootable\bootloader\u-boot\boot-firmware\tools\m
 ::PREBUILT directoy have "tcc8050_snor.cs.rom" for SNOR, MICOM R5.
 set PREBUILT=%SDK_PATH%\maincore\bootable\bootloader\u-boot\boot-firmware\tools\tcc805x_snor_mkimage
 
-cd FWDN
+cd %FWDN%
 fwdn.exe --fwdn %BOOT_FIRMWARE%\tcc805x_fwdn.cs.json
 fwdn.exe --storage emmc --low-format 
 fwdn.exe --storage snor --low-format 
 fwdn.exe --write %BOOT_FIRMWARE%\tcc805x_boot.cs.json
 fwdn.exe --write %SD_DATA%\SD_Data.fai --storage emmc --area user 
 fwdn.exe --write %PREBUILT%\tcc805x_snor.cs.rom --storage snor --area die1
-cd ..
+cd %TC_SCRIPT_PATH%
 @pause
